@@ -34,6 +34,9 @@
 #    install_aur_packages - More packages after packer (AUR helper) is
 #                           installed
 #    set_netcfg - Preload netcfg profiles
+#
+# https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system#Btrfs_subvolumes_with_swap
+# https://www.mayrhofer.eu.org/post/ssd-linux-benchmark/
 
 ## CONFIGURE THESE VARIABLES
 ## ALSO LOOK AT THE install_packages FUNCTION TO SEE WHAT IS ACTUALLY INSTALLED
@@ -41,11 +44,21 @@
 # Drive to install to.
 DRIVE='/dev/sda'
 
+# Device name for LUKS partition (must be lowercased)
+LUKS_NAME='crypto'
+
+# Root logical volume size
+ROOT_SIZE="60G"
+
+# BTRFS mount options
+#TODO discard=async to enable TRIM?
+MOUNT_OPTS="noatime,nodiratime,ssd,compress=lzo"
+
 # Hostname of the installed machine.
 HOSTNAME='host100'
 
-# Encrypt everything (except /boot).  Leave blank to disable.
-ENCRYPT_DRIVE='TRUE'
+# Encrypt everything (except /boot).  ALWAYS ENABLED
+#ENCRYPT_DRIVE='TRUE'
 
 # Passphrase used to encrypt the drive (leave blank to be prompted).
 DRIVE_PASSPHRASE=''
@@ -86,39 +99,33 @@ WIRELESS_DEVICE="wlan0"
 #WIRELESS_DEVICE="eth1"
 
 setup() {
-    local boot_dev="$DRIVE"1
-    local lvm_dev="$DRIVE"2
+    local efi_dev="$DRIVE"1
+    local crypt_dev="$DRIVE"2
 
     echo 'Creating partitions'
     partition_drive "$DRIVE"
 
-    if [ -n "$ENCRYPT_DRIVE" ]
+    local luks_part="/dev/mapper/$LUKS_NAME"
+
+    if [ -z "$DRIVE_PASSPHRASE" ]
     then
-        local lvm_part="/dev/mapper/lvm"
-
-        if [ -z "$DRIVE_PASSPHRASE" ]
-        then
-            echo 'Enter a passphrase to encrypt the disk:'
-            stty -echo
-            read DRIVE_PASSPHRASE
-            stty echo
-        fi
-
-        echo 'Encrypting partition'
-        encrypt_drive "$lvm_dev" "$DRIVE_PASSPHRASE" lvm
-
-    else
-        local lvm_part="$lvm_dev"
+        echo 'Enter a passphrase to encrypt the disk:'
+        stty -echo
+        read DRIVE_PASSPHRASE
+        stty echo
     fi
 
-    echo 'Setting up LVM'
-    setup_lvm "$lvm_part" vg00
+    echo 'Encrypting partition'
+    encrypt_drive "$crypt_dev" "$DRIVE_PASSPHRASE" $LUKS_NAME
+
+    # echo 'Setting up LVM'
+    # setup_lvm "$luks_part" vg00
 
     echo 'Formatting filesystems'
-    format_filesystems "$boot_dev"
+    format_filesystems "$efi_dev" "$luks_part" "$LUKS_NAME"
 
     echo 'Mounting filesystems'
-    mount_filesystems "$boot_dev"
+    mount_filesystems "$efi_dev"
 
     echo 'Installing base system'
     install_base
@@ -139,8 +146,8 @@ setup() {
 }
 
 configure() {
-    local boot_dev="$DRIVE"1
-    local lvm_dev="$DRIVE"2
+    local efi_dev="$DRIVE"1
+    local crypt_dev="$DRIVE"2
 
     echo 'Installing additional packages'
     install_packages
@@ -173,7 +180,7 @@ configure() {
     set_hosts "$HOSTNAME"
 
     echo 'Setting fstab'
-    set_fstab "$TMP_ON_TMPFS" "$boot_dev"
+    set_fstab "$TMP_ON_TMPFS" "$efi_dev"
 
     echo 'Setting initial modules to load'
     set_modules_load
@@ -185,7 +192,7 @@ configure() {
     set_daemons "$TMP_ON_TMPFS"
 
     echo 'Configuring bootloader'
-    set_syslinux "$lvm_dev"
+    set_syslinux "$crypt_dev"
 
     echo 'Configuring sudo'
     set_sudoers
@@ -228,13 +235,12 @@ configure() {
 partition_drive() {
     local dev="$1"; shift
 
-    # 100 MB /boot partition, everything else under LVM
+    # 300 MB ESP partition, everything else under encrypted BTRFS
     parted -s "$dev" \
-        mklabel msdos \
-        mkpart primary ext2 1 100M \
-        mkpart primary ext2 100M 100% \
-        set 1 boot on \
-        set 2 LVM on
+        mklabel gpt \
+        mkpart "EFI system partition" fat32 1 300M \
+        mkpart "Encrypted system partition" 300M 100% \
+        set 1 esp on
 }
 
 encrypt_drive() {
@@ -242,8 +248,10 @@ encrypt_drive() {
     local passphrase="$1"; shift
     local name="$1"; shift
 
-    echo -en "$passphrase" | cryptsetup -c aes-xts-plain -y -s 512 luksFormat "$dev"
-    echo -en "$passphrase" | cryptsetup luksOpen "$dev" lvm
+    # Encrypt drive with LUKS1, GRUB still doesn't support LUKS2
+    #TODO switch to LUKS2 when suport comes to GRUB
+    echo -en "$passphrase" | cryptsetup -y --type luks1 luksFormat "$dev"
+    echo -en "$passphrase" | cryptsetup luksOpen "$dev" $name
 }
 
 setup_lvm() {
@@ -254,36 +262,65 @@ setup_lvm() {
     vgcreate "$volgroup" "$partition"
 
     # Create a 1GB swap partition
-    lvcreate -C y -L1G "$volgroup" -n swap
+    #lvcreate -C y -L1G "$volgroup" -n swap
 
-    # Use the rest of the space for root
-    lvcreate -l '+100%FREE' "$volgroup" -n root
+    # Use configured size for root partition
+    lvcreate -L $ROOT_SIZE "$volgroup" -n root
+
+    # Use the rest for home partition
+    lvcreate -l '+100%FREE' "$volgroup" -n home
 
     # Enable the new volumes
     vgchange -ay
 }
 
 format_filesystems() {
-    local boot_dev="$1"; shift
+    local efi_dev="$1"; shift
+    local luks_part="$1"; shift
+    local label="$1"; shift
 
-    mkfs.ext2 -L boot "$boot_dev"
-    mkfs.ext4 -L root /dev/vg00/root
-    mkswap /dev/vg00/swap
+    mkfs.fat -F32 "$efi_dev"
+    mkfs.btrfs -L $label $luks_part
+
+    # Create subvolumes: root, snapshots, home anv /var/logs
+    mount -o $MOUNT_OPTS $luks_part /mnt
+    btrfs subvolume create /mnt/@
+    btrfs subvolume create /mnt/@snapshots
+    btrfs subvolume create /mnt/@home
+    # btrfs subvolume create /mnt/@var_log
+
+    umount /mnt
+
+    # Mount subvolumes and create nested subvolumes
+    mount -o $MOUNT_OPTS,subvol=@ $luks_part /mnt
+    mount -o $MOUNT_OPTS,subvol=@home $luks_part /mnt/home
+    mount -o $MOUNT_OPTS,subvol=@snapshots $luks_part /mnt/.snapshots
+    mkdir /mnt/var
+    mkdir /mnt/var/cache
+    mkdir /mnt/var/cache/pacman
+    btrfs subvolume create /mnt/var/cache/pacman/mnt
+
+    umount -R /mnt
+
 }
 
 mount_filesystems() {
-    local boot_dev="$1"; shift
+    local esp="$1"; shift
 
-    mount /dev/vg00/root /mnt
-    mkdir /mnt/boot
-    mount "$boot_dev" /mnt/boot
-    swapon /dev/vg00/swap
+    mount -o $MOUNT_OPTS,subvol=@ $luks_part /mnt
+    mkdir /mnt/efi
+    mount "$esp" /mnt/efi
+
+    mount -o $MOUNT_OPTS,subvol=@home $luks_part /mnt/home
+    mount -o $MOUNT_OPTS,subvol=@snapshots $luks_part /mnt/.snapshots
+
+    #swapon /dev/vg00/swap
 }
 
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel
+    pacstrap /mnt base base-devel btrfs-progs
     pacstrap /mnt syslinux
 }
 
@@ -420,10 +457,11 @@ EOF
 }
 
 set_fstab() {
+    #TODO change to BTRFS-dmcrypt layout
     local tmp_on_tmpfs="$1"; shift
-    local boot_dev="$1"; shift
+    local efi_dev="$1"; shift
 
-    local boot_uuid=$(get_uuid "$boot_dev")
+    local boot_uuid=$(get_uuid "$efi_dev")
 
     cat > /etc/fstab <<EOF
 #
@@ -443,6 +481,7 @@ set_modules_load() {
 }
 
 set_initcpio() {
+    #TODO load needed hooks for encryption
     local vid
 
     if [ "$VIDEO_DRIVER" = "i915" ]
@@ -561,9 +600,10 @@ set_daemons() {
 }
 
 set_syslinux() {
-    local lvm_dev="$1"; shift
+    #TODO change to GRUB
+    local crypt_dev="$1"; shift
 
-    local lvm_uuid=$(get_uuid "$lvm_dev")
+    local lvm_uuid=$(get_uuid "$crypt_dev")
 
     local crypt=""
     if [ -n "$ENCRYPT_DRIVE" ]
