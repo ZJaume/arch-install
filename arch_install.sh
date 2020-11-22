@@ -60,14 +60,15 @@ USER_NAME='user'
 USER_PASSWORD=''
 
 # System timezone.
-TIMEZONE='America/New_York'
+TIMEZONE='Europe/Madrid'
 
 # Have /tmp on a tmpfs or not.  Leave blank to disable.
 # Only leave this blank on systems with very little RAM.
 TMP_ON_TMPFS='TRUE'
 
-KEYMAP='us'
-# KEYMAP='dvorak'
+# System locale and keymap
+LOCALE='ca_ES.UTF-8'
+KEYMAP='es'
 
 # Choose your video driver
 # For Intel
@@ -398,9 +399,10 @@ set_timezone() {
 }
 
 set_locale() {
-    echo 'LANG="en_US.UTF-8"' >> /etc/locale.conf
+    echo "LANG=\"$LOCALE\"" >> /etc/locale.conf
     echo 'LC_COLLATE="C"' >> /etc/locale.conf
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+    echo "$LOCALE UTF-8" >> /etc/locale.gen
     locale-gen
 }
 
