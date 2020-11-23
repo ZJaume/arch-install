@@ -125,10 +125,13 @@ setup() {
     format_filesystems "$efi_dev" "$luks_part" "$LUKS_NAME"
 
     echo 'Mounting filesystems'
-    mount_filesystems "$efi_dev"
+    mount_filesystems "$efi_dev" "$luks_part" "$LUKS_NAME"
 
     echo 'Installing base system'
     install_base
+
+    echo 'Setting fstab'
+    set_fstab "$TMP_ON_TMPFS" "$efi_dev"
 
     echo 'Chrooting into installed system to continue setup...'
     cp $0 /mnt/setup.sh
@@ -153,10 +156,10 @@ configure() {
     install_packages
 
     echo 'Installing packer'
-    install_packer
+    # install_packer
 
     echo 'Installing AUR packages'
-    install_aur_packages
+    # install_aur_packages
 
     echo 'Clearing package tarballs'
     clean_packages
@@ -179,14 +182,11 @@ configure() {
     echo 'Setting hosts file'
     set_hosts "$HOSTNAME"
 
-    echo 'Setting fstab'
-    set_fstab "$TMP_ON_TMPFS" "$efi_dev"
-
     echo 'Setting initial modules to load'
     set_modules_load
 
     echo 'Configuring initial ramdisk'
-    set_initcpio
+    set_initcpio $crypt_dev
 
     echo 'Setting initial daemons'
     set_daemons "$TMP_ON_TMPFS"
@@ -306,15 +306,13 @@ format_filesystems() {
 
 mount_filesystems() {
     local esp="$1"; shift
+    local luks_part="$1"; shift
 
     mount -o $MOUNT_OPTS,subvol=@ $luks_part /mnt
     mkdir /mnt/efi
     mount "$esp" /mnt/efi
-
     mount -o $MOUNT_OPTS,subvol=@home $luks_part /mnt/home
     mount -o $MOUNT_OPTS,subvol=@snapshots $luks_part /mnt/.snapshots
-
-    #swapon /dev/vg00/swap
 }
 
 install_base() {
@@ -457,23 +455,8 @@ EOF
 }
 
 set_fstab() {
-    #TODO change to BTRFS-dmcrypt layout
-    local tmp_on_tmpfs="$1"; shift
-    local efi_dev="$1"; shift
-
-    local boot_uuid=$(get_uuid "$efi_dev")
-
-    cat > /etc/fstab <<EOF
-#
-# /etc/fstab: static file system information
-#
-# <file system> <dir>    <type> <options>    <dump> <pass>
-
-/dev/vg00/swap none swap  sw                0 0
-/dev/vg00/root /    ext4  defaults,relatime 0 1
-
-UUID=$boot_uuid /boot ext2 defaults,relatime 0 2
-EOF
+    # Try genfstab
+    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
 set_modules_load() {
@@ -481,102 +464,22 @@ set_modules_load() {
 }
 
 set_initcpio() {
-    #TODO load needed hooks for encryption
-    local vid
+    local crypt_dev="$1"; shift
+    local keyfile="crypto_keyfile.bin"
 
-    if [ "$VIDEO_DRIVER" = "i915" ]
-    then
-        vid='i915'
-    elif [ "$VIDEO_DRIVER" = "nouveau" ]
-    then
-        vid='nouveau'
-    elif [ "$VIDEO_DRIVER" = "radeon" ]
-    then
-        vid='radeon'
-    fi
+    # Generate keyfile for unlocking ecrypted drive
+    echo Generating keyfile
+    dd bs=512 count=4 if=/dev/random of=/$keyfile iflag=fullblock
+    chmod 600 /$keyfile
+    chmod 600 /boot/initramfs-linux*
+    echo Adding keyfile to LUKS header...
+    cryptsetup luksAddkey $crypt_dev /$keyfile
 
-    local encrypt=""
-    if [ -n "$ENCRYPT_DRIVE" ]
-    then
-        encrypt="encrypt"
-    fi
-
-
-    # Set MODULES with your video driver
-    cat > /etc/mkinitcpio.conf <<EOF
-# vim:set ft=sh
-# MODULES
-# The following modules are loaded before any boot hooks are
-# run.  Advanced users may wish to specify all system modules
-# in this array.  For instance:
-#     MODULES="piix ide_disk reiserfs"
-MODULES="ext4 $vid"
-
-# BINARIES
-# This setting includes any additional binaries a given user may
-# wish into the CPIO image.  This is run last, so it may be used to
-# override the actual binaries included by a given hook
-# BINARIES are dependency parsed, so you may safely ignore libraries
-BINARIES=""
-
-# FILES
-# This setting is similar to BINARIES above, however, files are added
-# as-is and are not parsed in any way.  This is useful for config files.
-# Some users may wish to include modprobe.conf for custom module options
-# like so:
-#    FILES="/etc/modprobe.d/modprobe.conf"
-FILES=""
-
-# HOOKS
-# This is the most important setting in this file.  The HOOKS control the
-# modules and scripts added to the image, and what happens at boot time.
-# Order is important, and it is recommended that you do not change the
-# order in which HOOKS are added.  Run 'mkinitcpio -H <hook name>' for
-# help on a given hook.
-# 'base' is _required_ unless you know precisely what you are doing.
-# 'udev' is _required_ in order to automatically load modules
-# 'filesystems' is _required_ unless you specify your fs modules in MODULES
-# Examples:
-##   This setup specifies all modules in the MODULES setting above.
-##   No raid, lvm2, or encrypted root is needed.
-#    HOOKS="base"
-#
-##   This setup will autodetect all modules for your system and should
-##   work as a sane default
-#    HOOKS="base udev autodetect pata scsi sata filesystems"
-#
-##   This is identical to the above, except the old ide subsystem is
-##   used for IDE devices instead of the new pata subsystem.
-#    HOOKS="base udev autodetect ide scsi sata filesystems"
-#
-##   This setup will generate a 'full' image which supports most systems.
-##   No autodetection is done.
-#    HOOKS="base udev pata scsi sata usb filesystems"
-#
-##   This setup assembles a pata mdadm array with an encrypted root FS.
-##   Note: See 'mkinitcpio -H mdadm' for more information on raid devices.
-#    HOOKS="base udev pata mdadm encrypt filesystems"
-#
-##   This setup loads an lvm2 volume group on a usb device.
-#    HOOKS="base udev usb lvm2 filesystems"
-#
-##   NOTE: If you have /usr on a separate partition, you MUST include the
-#    usr, fsck and shutdown hooks.
-HOOKS="base udev autodetect modconf block keymap keyboard $encrypt lvm2 resume filesystems fsck"
-
-# COMPRESSION
-# Use this to compress the initramfs image. By default, gzip compression
-# is used. Use 'cat' to create an uncompressed image.
-#COMPRESSION="gzip"
-#COMPRESSION="bzip2"
-#COMPRESSION="lzma"
-#COMPRESSION="xz"
-#COMPRESSION="lzop"
-
-# COMPRESSION_OPTIONS
-# Additional options for the compressor
-#COMPRESSION_OPTIONS=""
-EOF
+    # Configure mkinitcpio
+    sed -i 's/^MODULES=.*/MODULES=(btrfs)' /etc/mkinitcpio.conf
+    sed -i "s/^FILES=.*/FILES=(\/$keyfile)" /etc/mkinitcpio.conf
+    sed -i "s/^BINARIES=.*/BINARIES=(\/usr\/bin\/btrfs)" /etc/mkinitcpio.conf
+    sed -i "s/^HOOKS=.*/HOOKS=(base udev autodetect modconf block encrypt keyboard resume fsck)" /etc/mkinitcpio.conf
 
     mkinitcpio -p linux
 }
@@ -936,7 +839,7 @@ update_locate() {
 }
 
 get_uuid() {
-    blkid -o export "$1" | grep UUID | awk -F= '{print $2}'
+    lsblk -dno UUID $1
 }
 
 set -ex
