@@ -44,6 +44,9 @@
 # Drive to install to.
 DRIVE='/dev/sda'
 
+# If the driva is SSD
+SSD='TRUE'
+
 # Device name for LUKS partition (must be lowercased)
 LUKS_NAME='crypto'
 
@@ -52,7 +55,10 @@ ROOT_SIZE="60G"
 
 # BTRFS mount options
 #TODO discard=async to enable TRIM?
-MOUNT_OPTS="noatime,nodiratime,ssd,compress=lzo"
+MOUNT_OPTS="noatime,nodiratime,compress=lzo"
+if [ "$SSD" == "TRUE" ]; then
+    MOUNT_OPTS="$MOUNT_OPTS,ssd"
+fi
 
 # Hostname of the installed machine.
 HOSTNAME='host100'
@@ -94,9 +100,12 @@ VIDEO_DRIVER="i915"
 #VIDEO_DRIVER="vesa"
 
 # Wireless device, leave blank to not use wireless and use DHCP instead.
-WIRELESS_DEVICE="wlan0"
+NETWORK_DEVICE="wlan0"
 # For tc4200's
-#WIRELESS_DEVICE="eth1"
+#NETWORK_DEVICE="eth1"
+
+# List of kernels to install
+KERNELS="linux"
 
 setup() {
     local efi_dev="$DRIVE"1
@@ -197,13 +206,10 @@ configure() {
     echo 'Configuring sudo'
     set_sudoers
 
-    echo 'Configuring slim'
-    set_slim
-
-    if [ -n "$WIRELESS_DEVICE" ]
+    if [ -n "$NETWORK_DEVICE" ]
     then
-        echo 'Configuring netcfg'
-        set_netcfg
+        echo 'Configuring network'
+        set_network
     fi
 
     if [ -z "$ROOT_PASSWORD" ]
@@ -240,7 +246,8 @@ partition_drive() {
         mklabel gpt \
         mkpart "EFI system partition" fat32 1 300M \
         mkpart "Encrypted system partition" 300M 100% \
-        set 1 esp on
+        set 1 esp on \
+        set 1 bios_grub on
 }
 
 encrypt_drive() {
@@ -318,8 +325,7 @@ mount_filesystems() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel btrfs-progs
-    pacstrap /mnt syslinux
+    pacstrap /mnt base base-devel btrfs-progs grub $KERNELS
 }
 
 unmount_filesystems() {
@@ -343,7 +349,7 @@ install_packages() {
     packages+=' apache-ant cmake gdb git maven mercurial subversion tcpdump valgrind wireshark-gtk'
 
     # Netcfg
-    if [ -n "$WIRELESS_DEVICE" ]
+    if [ -n "$NETWORK_DEVICE" ]
     then
         packages+=' netcfg ifplugd dialog wireless_tools wpa_actiond wpa_supplicant'
     fi
@@ -481,20 +487,15 @@ set_initcpio() {
     sed -i "s/^BINARIES=.*/BINARIES=(\/usr\/bin\/btrfs)" /etc/mkinitcpio.conf
     sed -i "s/^HOOKS=.*/HOOKS=(base udev autodetect modconf block encrypt keyboard resume fsck)" /etc/mkinitcpio.conf
 
-    mkinitcpio -p linux
+    for kernel in $KERNELS; do
+        mkinitcpio -p $kernel
+    done
 }
 
 set_daemons() {
     local tmp_on_tmpfs="$1"; shift
 
-    systemctl enable cronie.service cpupower.service ntpd.service slim.service
-
-    if [ -n "$WIRELESS_DEVICE" ]
-    then
-        systemctl enable net-auto-wired.service net-auto-wireless.service
-    else
-        systemctl enable dhcpcd@eth0.service
-    fi
+    systemctl enable ntpd.service
 
     if [ -z "$tmp_on_tmpfs" ]
     then
@@ -502,322 +503,39 @@ set_daemons() {
     fi
 }
 
-set_syslinux() {
-    #TODO change to GRUB
+set_grub() {
     local crypt_dev="$1"; shift
-
-    local lvm_uuid=$(get_uuid "$crypt_dev")
-
-    local crypt=""
-    if [ -n "$ENCRYPT_DRIVE" ]
+    local crypt_uuid=$(get_uuid "$crypt_dev")
+    if [ "$SSD" == "TRUE" ]; then
+        DISCARDS=":allow-discards"
     then
-        # Load in resources
-        crypt="cryptdevice=/dev/disk/by-uuid/$lvm_uuid:lvm"
+        DISCARDS=""
     fi
 
-    cat > /boot/syslinux/syslinux.cfg <<EOF
-# Config file for Syslinux -
-# /boot/syslinux/syslinux.cfg
-#
-# Comboot modules:
-#   * menu.c32 - provides a text menu
-#   * vesamenu.c32 - provides a graphical menu
-#   * chain.c32 - chainload MBRs, partition boot sectors, Windows bootloaders
-#   * hdt.c32 - hardware detection tool
-#   * reboot.c32 - reboots the system
-#   * poweroff.com - shutdown the system
-#
-# To Use: Copy the respective files from /usr/lib/syslinux to /boot/syslinux.
-# If /usr and /boot are on the same file system, symlink the files instead
-# of copying them.
-#
-# If you do not use a menu, a 'boot:' prompt will be shown and the system
-# will boot automatically after 5 seconds.
-#
-# Please review the wiki: https://wiki.archlinux.org/index.php/Syslinux
-# The wiki provides further configuration examples
+    grub-install --target=i386-pc $DRIVE
 
-DEFAULT arch
-PROMPT 0        # Set to 1 if you always want to display the boot: prompt 
-TIMEOUT 50
-# You can create syslinux keymaps with the keytab-lilo tool
-#KBDMAP de.ktl
+    sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet cryptdevice=UUID=$crypt_uuid:$LUKS_NAME$DISCARDS\"/"
+    sed -i 's/^#GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/'
+    sed -i 's/^GRUB_PRELOAD_MODULES=.*/GRUB_PRELOAD_MODULES="part_gpt"/'
 
-# Menu Configuration
-# Either menu.c32 or vesamenu32.c32 must be copied to /boot/syslinux 
-UI menu.c32
-#UI vesamenu.c32
-
-# Refer to http://syslinux.zytor.com/wiki/index.php/Doc/menu
-MENU TITLE Arch Linux
-#MENU BACKGROUND splash.png
-MENU COLOR border       30;44   #40ffffff #a0000000 std
-MENU COLOR title        1;36;44 #9033ccff #a0000000 std
-MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all
-MENU COLOR unsel        37;44   #50ffffff #a0000000 std
-MENU COLOR help         37;40   #c0ffffff #a0000000 std
-MENU COLOR timeout_msg  37;40   #80ffffff #00000000 std
-MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std
-MENU COLOR msg07        37;40   #90ffffff #a0000000 std
-MENU COLOR tabmsg       31;40   #30ffffff #00000000 std
-
-# boot sections follow
-#
-# TIP: If you want a 1024x768 framebuffer, add "vga=773" to your kernel line.
-#
-#-*
-
-LABEL arch
-	MENU LABEL Arch Linux
-	LINUX ../vmlinuz-linux
-	APPEND root=/dev/vg00/root ro $crypt resume=/dev/vg00/swap quiet
-	INITRD ../initramfs-linux.img
-
-LABEL archfallback
-	MENU LABEL Arch Linux Fallback
-	LINUX ../vmlinuz-linux
-	APPEND root=/dev/vg00/root ro $crypt resume=/dev/vg00/swap
-	INITRD ../initramfs-linux-fallback.img
-
-LABEL hdt
-        MENU LABEL HDT (Hardware Detection Tool)
-        COM32 hdt.c32
-
-LABEL reboot
-        MENU LABEL Reboot
-        COM32 reboot.c32
-
-LABEL off
-        MENU LABEL Power Off
-        COMBOOT poweroff.com
-EOF
-
-    syslinux-install_update -iam
+    grub-mkconfig -o /boot/grub/grub.cfg
 }
 
 set_sudoers() {
-    cat > /etc/sudoers <<EOF
-## sudoers file.
-##
-## This file MUST be edited with the 'visudo' command as root.
-## Failure to use 'visudo' may result in syntax or file permission errors
-## that prevent sudo from running.
-##
-## See the sudoers man page for the details on how to write a sudoers file.
-##
-
-##
-## Host alias specification
-##
-## Groups of machines. These may include host names (optionally with wildcards),
-## IP addresses, network numbers or netgroups.
-# Host_Alias	WEBSERVERS = www1, www2, www3
-
-##
-## User alias specification
-##
-## Groups of users.  These may consist of user names, uids, Unix groups,
-## or netgroups.
-# User_Alias	ADMINS = millert, dowdy, mikef
-
-##
-## Cmnd alias specification
-##
-## Groups of commands.  Often used to group related commands together.
-# Cmnd_Alias	PROCESSES = /usr/bin/nice, /bin/kill, /usr/bin/renice, \
-# 			    /usr/bin/pkill, /usr/bin/top
-
-##
-## Defaults specification
-##
-## You may wish to keep some of the following environment variables
-## when running commands via sudo.
-##
-## Locale settings
-# Defaults env_keep += "LANG LANGUAGE LINGUAS LC_* _XKB_CHARSET"
-##
-## Run X applications through sudo; HOME is used to find the
-## .Xauthority file.  Note that other programs use HOME to find   
-## configuration files and this may lead to privilege escalation!
-# Defaults env_keep += "HOME"
-##
-## X11 resource path settings
-# Defaults env_keep += "XAPPLRESDIR XFILESEARCHPATH XUSERFILESEARCHPATH"
-##
-## Desktop path settings
-# Defaults env_keep += "QTDIR KDEDIR"
-##
-## Allow sudo-run commands to inherit the callers' ConsoleKit session
-# Defaults env_keep += "XDG_SESSION_COOKIE"
-##
-## Uncomment to enable special input methods.  Care should be taken as
-## this may allow users to subvert the command being run via sudo.
-# Defaults env_keep += "XMODIFIERS GTK_IM_MODULE QT_IM_MODULE QT_IM_SWITCHER"
-##
-## Uncomment to enable logging of a command's output, except for
-## sudoreplay and reboot.  Use sudoreplay to play back logged sessions.
-# Defaults log_output
-# Defaults!/usr/bin/sudoreplay !log_output
-# Defaults!/usr/local/bin/sudoreplay !log_output
-# Defaults!/sbin/reboot !log_output
-
-##
-## Runas alias specification
-##
-
-##
-## User privilege specification
-##
-root ALL=(ALL) ALL
-
-## Uncomment to allow members of group wheel to execute any command
-%wheel ALL=(ALL) ALL
-
-## Same thing without a password
-# %wheel ALL=(ALL) NOPASSWD: ALL
-
-## Uncomment to allow members of group sudo to execute any command
-# %sudo ALL=(ALL) ALL
-
-## Uncomment to allow any user to run sudo if they know the password
-## of the user they are running the command as (root by default).
-# Defaults targetpw  # Ask for the password of the target user
-# ALL ALL=(ALL) ALL  # WARNING: only use this together with 'Defaults targetpw'
-
-%rfkill ALL=(ALL) NOPASSWD: /usr/sbin/rfkill
-%network ALL=(ALL) NOPASSWD: /usr/bin/netcfg, /usr/bin/wifi-menu
-
-## Read drop-in files from /etc/sudoers.d
-## (the '#' here does not indicate a comment)
-#includedir /etc/sudoers.d
-EOF
-
-    chmod 440 /etc/sudoers
+    sed -i "s/^#%wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/"
 }
 
-set_slim() {
-    cat > /etc/slim.conf <<EOF
-# Path, X server and arguments (if needed)
-# Note: -xauth $authfile is automatically appended
-default_path        /bin:/usr/bin:/usr/local/bin
-default_xserver     /usr/bin/X
-xserver_arguments -nolisten tcp vt07
+set_network() {
+    if [ "$NETWORK_DEVICE" =~ "wl" ]; then
+        systemctl enable iwd
 
-# Commands for halt, login, etc.
-halt_cmd            /sbin/poweroff
-reboot_cmd          /sbin/reboot
-console_cmd         /usr/bin/xterm -C -fg white -bg black +sb -T "Console login" -e /bin/sh -c "/bin/cat /etc/issue; exec /bin/login"
-suspend_cmd         /usr/bin/systemctl hybrid-sleep
+        # echo 'Enter the network SSID:'
+        # read -l ssid
 
-# Full path to the xauth binary
-xauth_path         /usr/bin/xauth 
-
-# Xauth file for server
-authfile           /var/run/slim.auth
-
-# Activate numlock when slim starts. Valid values: on|off
-# numlock             on
-
-# Hide the mouse cursor (note: does not work with some WMs).
-# Valid values: true|false
-# hidecursor          false
-
-# This command is executed after a succesful login.
-# you can place the %session and %theme variables
-# to handle launching of specific commands in .xinitrc
-# depending of chosen session and slim theme
-#
-# NOTE: if your system does not have bash you need
-# to adjust the command according to your preferred shell,
-# i.e. for freebsd use:
-# login_cmd           exec /bin/sh - ~/.xinitrc %session
-# login_cmd           exec /bin/bash -login ~/.xinitrc %session
-login_cmd           exec /bin/zsh -l ~/.xinitrc %session
-
-# Commands executed when starting and exiting a session.
-# They can be used for registering a X11 session with
-# sessreg. You can use the %user variable
-#
-# sessionstart_cmd	some command
-# sessionstop_cmd	some command
-
-# Start in daemon mode. Valid values: yes | no
-# Note that this can be overriden by the command line
-# options "-d" and "-nodaemon"
-# daemon	yes
-
-# Available sessions (first one is the default).
-# The current chosen session name is replaced in the login_cmd
-# above, so your login command can handle different sessions.
-# see the xinitrc.sample file shipped with slim sources
-sessions            foo
-
-# Executed when pressing F11 (requires imagemagick)
-#screenshot_cmd      import -window root /slim.png
-
-# welcome message. Available variables: %host, %domain
-welcome_msg         %host
-
-# Session message. Prepended to the session name when pressing F1
-# session_msg         Session: 
-
-# shutdown / reboot messages
-shutdown_msg       The system is shutting down...
-reboot_msg         The system is rebooting...
-
-# default user, leave blank or remove this line
-# for avoid pre-loading the username.
-#default_user        simone
-
-# Focus the password field on start when default_user is set
-# Set to "yes" to enable this feature
-#focus_password      no
-
-# Automatically login the default user (without entering
-# the password. Set to "yes" to enable this feature
-#auto_login          no
-
-# current theme, use comma separated list to specify a set to 
-# randomly choose from
-#current_theme       default
-current_theme       archlinux-simplyblack
-
-# Lock file
-lockfile            /run/lock/slim.lock
-
-# Log file
-logfile             /var/log/slim.log
-EOF
-}
-
-set_netcfg() {
-    cat > /etc/network.d/wired <<EOF
-CONNECTION='ethernet'
-DESCRIPTION='Ethernet with DHCP'
-INTERFACE='eth0'
-IP='dhcp'
-EOF
-
-    chmod 600 /etc/network.d/wired
-
-    cat > /etc/conf.d/netcfg <<EOF
-# Enable these netcfg profiles at boot time.
-#   - prefix an entry with a '@' to background its startup
-#   - set to 'last' to restore the profiles running at the last shutdown
-#   - set to 'menu' to present a menu (requires the dialog package)
-# Network profiles are found in /etc/network.d
-NETWORKS=()
-
-# Specify the name of your wired interface for net-auto-wired
-WIRED_INTERFACE="eth0"
-
-# Specify the name of your wireless interface for net-auto-wireless
-WIRELESS_INTERFACE="$WIRELESS_DEVICE"
-
-# Array of profiles that may be started by net-auto-wireless.
-# When not specified, all wireless profiles are considered.
-#AUTO_PROFILES=("profile1" "profile2")
-EOF
+        # iwctl station $NETWORK_DEVICE conncet $ssid
+    else
+        systemctl enable dhcpcd@$NETWORK_DEVICE.service
+    fi
 }
 
 set_root_password() {
