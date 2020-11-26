@@ -101,8 +101,6 @@ VIDEO_DRIVER="i915"
 
 # Wireless device, leave blank to not use wireless and use DHCP instead.
 NETWORK_DEVICE="wlan0"
-# For tc4200's
-#NETWORK_DEVICE="eth1"
 
 # List of kernels to install
 KERNELS="linux"
@@ -164,11 +162,8 @@ configure() {
     echo 'Installing additional packages'
     install_packages
 
-    echo 'Installing packer'
-    # install_packer
-
-    echo 'Installing AUR packages'
-    # install_aur_packages
+    echo 'Installing yay and powerpill'
+    install_yay
 
     echo 'Clearing package tarballs'
     clean_packages
@@ -325,7 +320,7 @@ mount_filesystems() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel btrfs-progs grub $KERNELS
+    pacstrap /mnt base base-devel git btrfs-progs grub $KERNELS
 }
 
 unmount_filesystems() {
@@ -343,44 +338,23 @@ install_packages() {
     local packages=''
 
     # General utilities/libraries
-    packages+=' alsa-utils aspell-en chromium cpupower gvim mlocate net-tools ntp openssh p7zip pkgfile powertop python python2 rfkill rsync sudo unrar unzip wget zip systemd-sysvcompat zsh grml-zsh-config'
+    packages+=' alsa-utils openssh python rfkill rsync sudo unrar unzip zip pigz wget curl screen tmux systemd-sysvcompat fish'
 
-    # Development packages
-    packages+=' apache-ant cmake gdb git maven mercurial subversion tcpdump valgrind wireshark-gtk'
-
-    # Netcfg
+    # DNScrypt
     if [ -n "$NETWORK_DEVICE" ]
     then
-        packages+=' netcfg ifplugd dialog wireless_tools wpa_actiond wpa_supplicant'
+        packages+=' dnscrypt-proxy'
     fi
 
-    # Java stuff
-    packages+=' icedtea-web-java7 jdk7-openjdk jre7-openjdk'
-
-    # Libreoffice
-    packages+=' libreoffice-calc libreoffice-en-US libreoffice-gnome libreoffice-impress libreoffice-writer hunspell-en hyphen-en mythes-en'
-
     # Misc programs
-    packages+=' mplayer pidgin vlc xscreensaver gparted dosfstools ntfsprogs'
-
-    # Xserver
-    packages+=' xorg-apps xorg-server xorg-xinit xterm'
-
-    # Slim login manager
-    packages+=' slim archlinux-themes-slim'
-
-    # Fonts
-    packages+=' ttf-dejavu ttf-liberation'
+    packages+=' vlc parted dosfstools ntfsprogs exfat-utils hunspell-en hunspell-es hunspell-ca'
 
     # On Intel processors
+    #TODO review microcode stuff
     packages+=' intel-ucode'
 
-    # For laptops
-    packages+=' xf86-input-synaptics'
-
-    # Extra packages for tc4200 tablet
-    #packages+=' ipw2200-fw xf86-input-wacom'
-
+    # Graphics drivers
+    #TODO review graphics stuff
     if [ "$VIDEO_DRIVER" = "i915" ]
     then
         packages+=' xf86-video-intel libva-intel-driver'
@@ -398,25 +372,16 @@ install_packages() {
     pacman -Sy --noconfirm $packages
 }
 
-install_packer() {
-    mkdir /foo
-    cd /foo
-    curl https://aur.archlinux.org/packages/pa/packer/packer.tar.gz | tar xzf -
-    cd packer
-    makepkg -si --noconfirm --asroot
+install_yay() {
+    cd /tmp
+    git clone https://aur.archlinux.org/yay.git
+    cd yay
+    makepkg -si --noconfirm
 
     cd /
-    rm -rf /foo
-}
+    rm -rf /tmp/yay
 
-install_aur_packages() {
-    mkdir /foo
-    export TMPDIR=/foo
-    packer -S --noconfirm android-udev
-    packer -S --noconfirm chromium-pepper-flash-stable
-    packer -S --noconfirm chromium-libpdf-stable
-    unset TMPDIR
-    rm -rf /foo
+    yay -S --noconfirm powerpill
 }
 
 clean_packages() {
