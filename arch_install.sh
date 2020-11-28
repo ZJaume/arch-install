@@ -452,7 +452,8 @@ set_grub() {
 }
 
 set_sudoers() {
-    sed -i "s/^#%wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/"
+    sed -i "s/^#%wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
+    echo "Defaults insults" >> /etc/sudoers
 }
 
 set_network() {
