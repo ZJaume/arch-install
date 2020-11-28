@@ -66,17 +66,8 @@ HOSTNAME='host100'
 # Encrypt everything (except /boot).  ALWAYS ENABLED
 #ENCRYPT_DRIVE='TRUE'
 
-# Passphrase used to encrypt the drive (leave blank to be prompted).
-DRIVE_PASSPHRASE=''
-
-# Root password (leave blank to be prompted).
-ROOT_PASSWORD=''
-
 # Main user to create (by default, added to wheel group, and others).
 USER_NAME='user'
-
-# The main user's password (leave blank to be prompted).
-USER_PASSWORD=''
 
 # System timezone.
 TIMEZONE='Europe/Madrid'
@@ -114,16 +105,8 @@ setup() {
 
     local luks_part="/dev/mapper/$LUKS_NAME"
 
-    if [ -z "$DRIVE_PASSPHRASE" ]
-    then
-        echo 'Enter a passphrase to encrypt the disk:'
-        stty -echo
-        read DRIVE_PASSPHRASE
-        stty echo
-    fi
-
     echo 'Encrypting partition'
-    encrypt_drive "$crypt_dev" "$DRIVE_PASSPHRASE" $LUKS_NAME
+    encrypt_drive "$crypt_dev" $LUKS_NAME
 
     # echo 'Setting up LVM'
     # setup_lvm "$luks_part" vg00
@@ -207,25 +190,11 @@ configure() {
         set_network
     fi
 
-    if [ -z "$ROOT_PASSWORD" ]
-    then
-        echo 'Enter the root password:'
-        stty -echo
-        read ROOT_PASSWORD
-        stty echo
-    fi
     echo 'Setting root password'
-    set_root_password "$ROOT_PASSWORD"
+    set_root_password
 
-    if [ -z "$USER_PASSWORD" ]
-    then
-        echo "Enter the password for user $USER_NAME"
-        stty -echo
-        read USER_PASSWORD
-        stty echo
-    fi
     echo 'Creating initial user'
-    create_user "$USER_NAME" "$USER_PASSWORD"
+    create_user "$USER_NAME"
 
     echo 'Building locate database'
     update_locate
@@ -247,13 +216,12 @@ partition_drive() {
 
 encrypt_drive() {
     local dev="$1"; shift
-    local passphrase="$1"; shift
     local name="$1"; shift
 
     # Encrypt drive with LUKS1, GRUB still doesn't support LUKS2
     #TODO switch to LUKS2 when suport comes to GRUB
-    echo -en "$passphrase" | cryptsetup -y --type luks1 luksFormat "$dev"
-    echo -en "$passphrase" | cryptsetup luksOpen "$dev" $name
+    cryptsetup -y --type luks1 luksFormat "$dev"
+    cryptsetup luksOpen "$dev" $name
 }
 
 setup_lvm() {
@@ -297,7 +265,7 @@ format_filesystems() {
     mount -o $MOUNT_OPTS,subvol=@ $luks_part /mnt
     mkdir /mnt/home
     mount -o $MOUNT_OPTS,subvol=@home $luks_part /mnt/home
-    mkdir /mnt/.snapshosts
+    mkdir /mnt/.snapshots
     mount -o $MOUNT_OPTS,subvol=@snapshots $luks_part /mnt/.snapshots
     mkdir /mnt/var
     mkdir /mnt/var/cache
@@ -501,17 +469,14 @@ set_network() {
 }
 
 set_root_password() {
-    local password="$1"; shift
-
-    echo -en "$password\n$password" | passwd
+    passwd
 }
 
 create_user() {
     local name="$1"; shift
-    local password="$1"; shift
 
     useradd -m -s /bin/zsh -G adm,systemd-journal,wheel,rfkill,games,network,video,audio,optical,floppy,storage,scanner,power,adbusers,wireshark "$name"
-    echo -en "$password\n$password" | passwd "$name"
+    passwd "$name"
 }
 
 update_locate() {
