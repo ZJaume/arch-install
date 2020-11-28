@@ -239,8 +239,8 @@ partition_drive() {
     # 300 MB ESP partition, everything else under encrypted BTRFS
     parted -s "$dev" \
         mklabel gpt \
-        mkpart "EFI system partition" fat32 1 300M \
-        mkpart "Encrypted system partition" 300M 100% \
+        mkpart ESP fat32 1 300M \
+        mkpart System 300M 100% \
         set 1 esp on \
         set 1 bios_grub on
 }
