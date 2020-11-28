@@ -142,11 +142,11 @@ configure() {
     local efi_dev="$DRIVE"1
     local crypt_dev="$DRIVE"2
 
-    echo 'Installing additional packages'
-    install_packages
-
     echo 'Installing yay and powerpill'
     install_yay
+
+    echo 'Installing additional packages'
+    install_packages
 
     echo 'Clearing package tarballs'
     clean_packages
@@ -312,7 +312,7 @@ install_packages() {
     fi
 
     # Misc programs
-    packages+=' vlc parted dosfstools ntfsprogs exfat-utils hunspell-en hunspell-es hunspell-ca'
+    packages+=' vlc parted dosfstools ntfsprogs exfat-utils hunspell-en_US hunspell-es_any hunspell-ca'
 
     # On Intel processors
     #TODO review microcode stuff
@@ -334,7 +334,7 @@ install_packages() {
         packages+=' xf86-video-vesa'
     fi
 
-    pacman -Sy --noconfirm $packages
+    yay -Sy --noconfirm $packages
 }
 
 install_yay() {
