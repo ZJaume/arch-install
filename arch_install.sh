@@ -295,7 +295,9 @@ format_filesystems() {
 
     # Mount subvolumes and create nested subvolumes
     mount -o $MOUNT_OPTS,subvol=@ $luks_part /mnt
+    mkdir /mnt/home
     mount -o $MOUNT_OPTS,subvol=@home $luks_part /mnt/home
+    mkdir /mnt/.snapshosts
     mount -o $MOUNT_OPTS,subvol=@snapshots $luks_part /mnt/.snapshots
     mkdir /mnt/var
     mkdir /mnt/var/cache
@@ -303,7 +305,6 @@ format_filesystems() {
     btrfs subvolume create /mnt/var/cache/pacman/mnt
 
     umount -R /mnt
-
 }
 
 mount_filesystems() {
