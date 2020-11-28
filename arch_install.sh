@@ -324,14 +324,10 @@ install_base() {
 }
 
 unmount_filesystems() {
-    umount /mnt/boot
-    umount /mnt
-    swapoff /dev/vg00/swap
-    vgchange -an
-    if [ -n "$ENCRYPT_DRIVE" ]
-    then
-        cryptsetup luksClose lvm
-    fi
+    umount -R /mnt
+    # swapoff /dev/vg00/swap
+    # vgchange -an
+    cryptsetup luksClose $LUKS_NAME
 }
 
 install_packages() {
