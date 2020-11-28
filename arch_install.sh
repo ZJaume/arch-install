@@ -473,7 +473,7 @@ set_grub() {
     local crypt_uuid=$(get_uuid "$crypt_dev")
     if [ "$SSD" == "TRUE" ]; then
         DISCARDS=":allow-discards"
-    then
+    else
         DISCARDS=""
     fi
 
