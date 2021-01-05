@@ -93,11 +93,11 @@ setup() {
     # echo 'Setting up LVM'
     # setup_lvm "$luks_part" vg00
 
-    echo 'Formatting filesystems'
-    format_filesystems "$efi_dev" "$luks_part" "$LUKS_NAME"
+    echo 'Formatting partitions'
+    format_partitions "$efi_dev" "$luks_part" "$LUKS_NAME"
 
-    echo 'Mounting filesystems'
-    mount_filesystems "$efi_dev" "$luks_part" "$LUKS_NAME"
+    echo 'Mounting partitions'
+    mount_partitions "$efi_dev" "$luks_part" "$LUKS_NAME"
 
     echo 'Installing base system'
     install_base
@@ -115,7 +115,7 @@ setup() {
         echo 'Make sure you unmount everything before you try to run this script again.'
     else
         echo 'Unmounting filesystems'
-        unmount_filesystems
+        unmount_partitions
         echo 'Done! Reboot system.'
     fi
 }
@@ -220,7 +220,7 @@ setup_lvm() {
     vgchange -ay
 }
 
-format_filesystems() {
+format_partitions() {
     local efi_dev="$1"; shift
     local luks_part="$1"; shift
     local label="$1"; shift
@@ -251,7 +251,7 @@ format_filesystems() {
     umount -R /mnt
 }
 
-mount_filesystems() {
+mount_partitions() {
     local esp="$1"; shift
     local luks_part="$1"; shift
 
@@ -268,7 +268,7 @@ install_base() {
     pacstrap /mnt base base-devel git btrfs-progs grub sudo $KERNELS
 }
 
-unmount_filesystems() {
+unmount_partitions() {
     umount -R /mnt
     # swapoff /dev/vg00/swap
     # vgchange -an
