@@ -78,45 +78,54 @@ NETWORK_DEVICE="wlan0"
 # List of kernels to install
 KERNELS="linux"
 
+color(){
+    case $1 in
+        red)
+            echo -e "\033[31m$2\033[0m";;
+        green)
+            echo -e "\033[32m$2\033[0m";;
+    esac
+}
+
 setup() {
     local efi_dev="$DRIVE"1
     local crypt_dev="$DRIVE"2
 
-    echo 'Creating partitions'
+    color green 'Creating partitions'
     partition_drive "$DRIVE"
 
     local luks_part="/dev/mapper/$LUKS_NAME"
 
-    echo 'Encrypting partition'
+    color green 'Encrypting partition'
     encrypt_drive "$crypt_dev" $LUKS_NAME
 
-    # echo 'Setting up LVM'
+    # color green 'Setting up LVM'
     # setup_lvm "$luks_part" vg00
 
-    echo 'Formatting partitions'
+    color green 'Formatting partitions'
     format_partitions "$efi_dev" "$luks_part" "$LUKS_NAME"
 
-    echo 'Mounting partitions'
+    color green 'Mounting partitions'
     mount_partitions "$efi_dev" "$luks_part" "$LUKS_NAME"
 
-    echo 'Installing base system'
+    color green 'Installing base system'
     install_base
 
-    echo 'Setting fstab'
+    color green 'Setting fstab'
     set_fstab "$TMP_ON_TMPFS" "$efi_dev"
 
-    echo 'Chrooting into installed system to continue setup...'
+    color green 'Chrooting into installed system to continue setup...'
     cp $0 /mnt/setup.sh
     arch-chroot /mnt ./setup.sh chroot
 
     if [ -f /mnt/setup.sh ]
     then
-        echo 'ERROR: Something failed inside the chroot, not unmounting filesystems so you can investigate.'
-        echo 'Make sure you unmount everything before you try to run this script again.'
+        color red 'ERROR: Something failed inside the chroot, not unmounting filesystems so you can investigate.'
+        color red 'Make sure you unmount everything before you try to run this script again.'
     else
-        echo 'Unmounting filesystems'
+        color green 'Unmounting filesystems'
         unmount_partitions
-        echo 'Done! Reboot system.'
+        color green 'Done! Reboot system.'
     fi
 }
 
@@ -124,55 +133,55 @@ configure() {
     local efi_dev="$DRIVE"1
     local crypt_dev="$DRIVE"2
 
-    echo 'Setting hostname'
+    color green 'Setting hostname'
     set_hostname "$HOSTNAME"
 
-    echo 'Setting timezone'
+    color green 'Setting timezone'
     set_timezone "$TIMEZONE"
 
-    echo 'Setting locale'
+    color green 'Setting locale'
     set_locale
 
-    echo 'Setting console keymap'
+    color green 'Setting console keymap'
     set_keymap
 
-    echo 'Setting hosts file'
+    color green 'Setting hosts file'
     set_hosts "$HOSTNAME"
 
-    echo 'Configuring initial ramdisk'
+    color green 'Configuring initial ramdisk'
     set_initcpio $crypt_dev
 
-    echo 'Configuring bootloader'
+    color green 'Configuring bootloader'
     set_grub "$crypt_dev"
 
-    echo 'Configuring sudo'
+    color green 'Configuring sudo'
     set_sudoers
 
-    echo 'Setting root password'
+    color green 'Setting root password'
     set_root_password
 
-    echo 'Creating initial user'
+    color green 'Creating initial user'
     create_user "$USER_NAME"
 
-    echo 'Installing yay and powerpill'
+    color green 'Installing yay and powerpill'
     install_yay
 
-    echo 'Installing additional packages'
+    color green 'Installing additional packages'
     install_packages
 
-    echo 'Clearing package tarballs'
+    color green 'Clearing package tarballs'
     clean_packages
 
-    echo 'Configuring network'
+    color green 'Configuring network'
     set_network
 
-    echo 'Setting initial daemons'
+    color green 'Setting initial daemons'
     set_daemons "$TMP_ON_TMPFS"
 
-    echo 'Setting initial modules to load'
+    color green 'Setting initial modules to load'
     set_modules_load
 
-    echo 'Building locate database'
+    color green 'Building locate database'
     update_locate
 
     rm /setup.sh
@@ -439,7 +448,7 @@ set_network() {
     if [ "$NETWORK_DEVICE" =~ "wl" ]; then
         systemctl enable iwd
 
-        # echo 'Enter the network SSID:'
+        # color green 'Enter the network SSID:'
         # read -l ssid
 
         # iwctl station $NETWORK_DEVICE conncet $ssid
