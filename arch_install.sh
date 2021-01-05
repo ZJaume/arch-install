@@ -388,7 +388,7 @@ set_initcpio() {
     chmod 600 /$keyfile
     chmod 600 /boot/initramfs-linux*
     echo Adding keyfile to LUKS header...
-    cryptsetup luksAddkey $crypt_dev /$keyfile
+    cryptsetup luksAddKey $crypt_dev /$keyfile
 
     # Configure mkinitcpio
     sed -i 's/^MODULES=.*/MODULES=(btrfs)' /etc/mkinitcpio.conf
