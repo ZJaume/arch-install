@@ -421,11 +421,11 @@ set_grub() {
         DISCARDS=""
     fi
 
-    grub-install --target=i386-pc $DRIVE
-
     sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet cryptdevice=UUID=$crypt_uuid:$LUKS_NAME$DISCARDS\"/"
     sed -i 's/^#GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/'
     sed -i 's/^GRUB_PRELOAD_MODULES=.*/GRUB_PRELOAD_MODULES="part_gpt"/'
+
+    grub-install --target=i386-pc $DRIVE
 
     grub-mkconfig -o /boot/grub/grub.cfg
 }
