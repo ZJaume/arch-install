@@ -142,18 +142,6 @@ configure() {
     local efi_dev="$DRIVE"1
     local crypt_dev="$DRIVE"2
 
-    echo 'Installing yay and powerpill'
-    install_yay
-
-    echo 'Installing additional packages'
-    install_packages
-
-    echo 'Clearing package tarballs'
-    clean_packages
-
-    echo 'Updating pkgfile database'
-    update_pkgfile
-
     echo 'Setting hostname'
     set_hostname "$HOSTNAME"
 
@@ -169,32 +157,38 @@ configure() {
     echo 'Setting hosts file'
     set_hosts "$HOSTNAME"
 
-    echo 'Setting initial modules to load'
-    set_modules_load
-
     echo 'Configuring initial ramdisk'
     set_initcpio $crypt_dev
 
-    echo 'Setting initial daemons'
-    set_daemons "$TMP_ON_TMPFS"
-
     echo 'Configuring bootloader'
-    set_syslinux "$crypt_dev"
+    set_grub "$crypt_dev"
 
     echo 'Configuring sudo'
     set_sudoers
-
-    if [ -n "$NETWORK_DEVICE" ]
-    then
-        echo 'Configuring network'
-        set_network
-    fi
 
     echo 'Setting root password'
     set_root_password
 
     echo 'Creating initial user'
     create_user "$USER_NAME"
+
+    echo 'Installing yay and powerpill'
+    install_yay
+
+    echo 'Installing additional packages'
+    install_packages
+
+    echo 'Clearing package tarballs'
+    clean_packages
+
+    echo 'Configuring network'
+    set_network
+
+    echo 'Setting initial daemons'
+    set_daemons "$TMP_ON_TMPFS"
+
+    echo 'Setting initial modules to load'
+    set_modules_load
 
     echo 'Building locate database'
     update_locate
@@ -289,7 +283,7 @@ mount_filesystems() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel git btrfs-progs grub $KERNELS
+    pacstrap /mnt base base-devel git btrfs-progs grub sudo $KERNELS
 }
 
 unmount_filesystems() {
@@ -303,16 +297,16 @@ install_packages() {
     local packages=''
 
     # General utilities/libraries
-    packages+=' alsa-utils openssh python rfkill rsync sudo unrar unzip zip pigz wget curl screen tmux systemd-sysvcompat fish'
+    packages+=' alsa-utils python rfkill rsync unrar unzip zip pigz wget curl screen tmux systemd-sysvcompat fish'
 
-    # DNScrypt
-    if [ -n "$NETWORK_DEVICE" ]
-    then
-        packages+=' dnscrypt-proxy'
-    fi
+    # Network
+    packages+=' dnscrypt-proxy syncthing bind iwd openssh'
+
+    # Filesystems
+    packages+=' parted dosfstools ntfsprogs exfat-utils'
 
     # Misc programs
-    packages+=' vlc parted dosfstools ntfsprogs exfat-utils hunspell-en_US hunspell-es_any hunspell-ca'
+    packages+=' vlc hunspell-en_US hunspell-es_any hunspell-ca'
 
     # On Intel processors
     #TODO review microcode stuff
@@ -338,6 +332,7 @@ install_packages() {
 }
 
 install_yay() {
+    su $USER
     cd /tmp
     git clone https://aur.archlinux.org/yay.git
     cd yay
@@ -347,6 +342,8 @@ install_yay() {
     rm -rf /tmp/yay
 
     yay -S --noconfirm powerpill
+
+    exit
 }
 
 clean_packages() {
