@@ -391,10 +391,10 @@ set_initcpio() {
     cryptsetup luksAddKey $crypt_dev /$keyfile
 
     # Configure mkinitcpio
-    sed -i 's/^MODULES=.*/MODULES=(btrfs)' /etc/mkinitcpio.conf
-    sed -i "s/^FILES=.*/FILES=(\/$keyfile)" /etc/mkinitcpio.conf
-    sed -i "s/^BINARIES=.*/BINARIES=(\/usr\/bin\/btrfs)" /etc/mkinitcpio.conf
-    sed -i "s/^HOOKS=.*/HOOKS=(base udev autodetect modconf block encrypt keyboard resume fsck)" /etc/mkinitcpio.conf
+    sed -i 's/^MODULES=.*/MODULES=(btrfs)/' /etc/mkinitcpio.conf
+    sed -i "s/^FILES=.*/FILES=(\/$keyfile)/" /etc/mkinitcpio.conf
+    sed -i "s/^BINARIES=.*/BINARIES=(\/usr\/bin\/btrfs)/" /etc/mkinitcpio.conf
+    sed -i "s/^HOOKS=.*/HOOKS=(base udev autodetect modconf block encrypt keyboard resume fsck)/" /etc/mkinitcpio.conf
 
     for kernel in $KERNELS; do
         mkinitcpio -p $kernel
