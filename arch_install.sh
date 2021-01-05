@@ -1,15 +1,16 @@
 #!/bin/bash
-# Copyright (c) 2012 Tom Wambold
+# Copyright of some portions of this project are held by (c) 2012 Tom Wambold.
+# All other copyright for this project are held by (c) 2021 Jaume Zaragoza.
 # 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
 # 
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
 # 
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -18,25 +19,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-# This script will set up an Arch installation with a 100 MB /boot partition
-# and an encrypted LVM partition with swap and / inside.  It also installs
-# and configures systemd as the init system (removing sysvinit).
-#
-# You should read through this script before running it in case you want to
-# make any modifications, in particular, the variables just below, and the
-# following functions:
-#
-#    partition_drive - Customize to change partition sizes (/boot vs LVM)
-#    setup_lvm - Customize for partitions inside LVM
-#    install_packages - Customize packages installed in base system
-#                       (desktop environment, etc.)
-#    install_aur_packages - More packages after packer (AUR helper) is
-#                           installed
-#    set_netcfg - Preload netcfg profiles
-#
-# https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system#Btrfs_subvolumes_with_swap
-# https://www.mayrhofer.eu.org/post/ssd-linux-benchmark/
 
 ## CONFIGURE THESE VARIABLES
 ## ALSO LOOK AT THE install_packages FUNCTION TO SEE WHAT IS ACTUALLY INSTALLED
