@@ -425,7 +425,7 @@ set_grub() {
     sed -i 's/^#GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
     sed -i 's/^GRUB_PRELOAD_MODULES=.*/GRUB_PRELOAD_MODULES="part_gpt"/' /etc/default/grub
 
-    grub-install --target=i386-pc $DRIVE
+    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
 
     grub-mkconfig -o /boot/grub/grub.cfg
 }
