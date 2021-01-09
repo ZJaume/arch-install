@@ -486,19 +486,33 @@ set_network() {
     fi
 }
 
+set_password() {
+    local user=$1; shift
+
+    set +e
+    for i in (seq 1 3); do
+        passwd $user
+        code=$?
+        if [ $code -eq 0 ]; then
+            break
+        elif [ $code -eq 10 ]; then
+            continue
+        else
+            exit $code
+        fi
+    done
+    set -e
+}
+
 set_root_password() {
-    passwd
+    set_password
 }
 
 create_user() {
     local name="$1"; shift
 
     useradd -m -s /bin/bash -G adm,systemd-journal,wheel,rfkill,games,network,video,audio,optical,floppy,storage,scanner,power "$name"
-    passwd "$name"
-}
-
-update_locate() {
-    updatedb
+    set_password "$name"
 }
 
 get_uuid() {
