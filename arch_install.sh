@@ -164,10 +164,10 @@ configure() {
     create_user "$USER_NAME"
 
     color green 'Installing yay and powerpill'
-    install_yay
+    install_yay "$USER_NAME"
 
     color green 'Installing additional packages'
-    install_packages
+    install_packages "$USER_NAME"
 
     color green 'Clearing package tarballs'
     clean_packages
@@ -285,6 +285,7 @@ unmount_partitions() {
 }
 
 install_packages() {
+    local user=$1; shift
     local packages=''
 
     # General utilities/libraries
@@ -319,7 +320,7 @@ install_packages() {
         packages+=' xf86-video-vesa'
     fi
 
-    yay -Sy --noconfirm $packages
+    sudo -u $user yay -Sy --noconfirm $packages
 }
 
 install_yay() {
@@ -333,7 +334,7 @@ install_yay() {
     cd /
     rm -rf /tmp/yay
 
-    yay -S --noconfirm powerpill
+    sudo -u $user yay -S --noconfirm powerpill
 }
 
 clean_packages() {
