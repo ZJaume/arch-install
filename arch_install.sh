@@ -323,18 +323,17 @@ install_packages() {
 }
 
 install_yay() {
-    su $USER
+    local user=$1; shift
+
     cd /tmp
-    git clone https://aur.archlinux.org/yay.git
+    sudo -u $user git clone https://aur.archlinux.org/yay.git
     cd yay
-    makepkg -si --noconfirm
+    sudo -u $user makepkg -si --noconfirm
 
     cd /
     rm -rf /tmp/yay
 
     yay -S --noconfirm powerpill
-
-    exit
 }
 
 clean_packages() {
@@ -440,7 +439,7 @@ set_grub() {
 }
 
 set_sudoers() {
-    sed -i "s/^#%wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
+    sed -i "s/^# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
     echo "Defaults insults" >> /etc/sudoers
 }
 
