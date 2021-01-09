@@ -490,7 +490,7 @@ set_password() {
     local user=$1; shift
 
     set +e
-    for i in (seq 1 3); do
+    for i in $(seq 1 3); do
         passwd $user
         code=$?
         if [ $code -eq 0 ]; then
