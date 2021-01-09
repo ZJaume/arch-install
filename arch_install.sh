@@ -91,6 +91,9 @@ setup() {
     local efi_dev="$DRIVE"1
     local crypt_dev="$DRIVE"2
 
+    color green 'Loading needed kernel modules'
+    load_modules
+
     color green 'Creating partitions'
     partition_drive "$DRIVE"
 
@@ -182,6 +185,12 @@ configure() {
     update_locate
 
     rm /setup.sh
+}
+
+load_modules() {
+    # iptables module for UFW
+    modprobe ip_tables
+    modprobe ip6_tables
 }
 
 partition_drive() {
@@ -407,7 +416,12 @@ set_initcpio() {
 set_daemons() {
     # Set firewall
     systemctl enable ufw
+    systemctl start ufw
+    ufw default deny
+    ufw allow from 192.168.1.0/24
     ufw allow syncthing
+    ufw enable
+    ufw status
 
     # Enable syncthing daemon
     systemctl enable syncthing
