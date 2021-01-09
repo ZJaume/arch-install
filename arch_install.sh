@@ -405,14 +405,22 @@ set_initcpio() {
 }
 
 set_daemons() {
-    local tmp_on_tmpfs="$1"; shift
+    # Set firewall
+    systemctl enable ufw
+    ufw allow syncthing
 
-    systemctl enable ntpd.service
+    # Enable syncthing daemon
+    systemctl enable syncthing
 
-    if [ -z "$tmp_on_tmpfs" ]
-    then
-        systemctl mask tmp.mount
-    fi
+    # Enable dnscrypt
+    sed -i "s/^server_names/server_names = ['cloudflare', 'dnscrypt.eu-dk']/'" /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+    systemctl enable dnscrypt-proxy
+
+    # Avoid resolv.conf being written by other programs
+    echo "nameserver 127.0.0.1" > /etc/resolv.conf
+    chattr +i /etc/resolv.conf
+    echo "nohook resolv.conf" >> /etc/dhcpcd.conf
+    systemctl disable systemd-resolved
 }
 
 set_grub() {
