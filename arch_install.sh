@@ -320,7 +320,7 @@ install_packages() {
         packages+=' xf86-video-vesa'
     fi
 
-    sudo -u $user yay -Sy --noconfirm $packages
+    sudo -u $user yay -Sy --pacman powerpill --noconfirm $packages
 }
 
 install_yay() {
