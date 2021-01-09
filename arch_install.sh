@@ -280,7 +280,7 @@ mount_partitions() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel git btrfs-progs grub efibootmgr sudo $KERNELS
+    pacstrap /mnt base base-devel pacman-contrib git btrfs-progs grub efibootmgr sudo $KERNELS
 }
 
 unmount_partitions() {
@@ -445,6 +445,9 @@ set_daemons() {
     chattr +i /etc/resolv.conf
     echo "nohook resolv.conf" >> /etc/dhcpcd.conf
     systemctl disable systemd-resolved
+
+    # Paccache timer
+    systemctl enable paccache.timer
 }
 
 set_grub() {
