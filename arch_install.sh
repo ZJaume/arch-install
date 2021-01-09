@@ -289,7 +289,7 @@ install_packages() {
     packages+=' alsa-utils python rfkill rsync unrar unzip zip pigz wget curl screen tmux systemd-sysvcompat fish'
 
     # Network
-    packages+=' dnscrypt-proxy syncthing bind iwd openssh'
+    packages+=' dnscrypt-proxy syncthing bind iwd openssh ufw'
 
     # Filesystems
     packages+=' parted dosfstools ntfsprogs exfat-utils'
