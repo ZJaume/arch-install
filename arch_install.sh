@@ -496,6 +496,7 @@ set_password() {
         if [ $code -eq 0 ]; then
             break
         elif [ $code -eq 10 ]; then
+            color red "Password verification failed, retrying..."
             continue
         else
             exit $code
