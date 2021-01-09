@@ -332,6 +332,15 @@ install_packages() {
 install_yay() {
     local user=$1; shift
 
+    # Update mirrorlists
+    reflector --verbose --protocol https --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
+
+    # Configure makepkg and pacman
+    sed -i 's/^#MAKEFLAGS/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
+    sed -i 's/^BUILDENV=/BUILDENV=(!distcc color ccache check !sign)/' /etc/makepkg.conf
+    sed -i 's/^SigLevel/SigLevel = PackageRequired/' /etc/pacman.conf
+
+    # Build yay
     cd /tmp
     sudo -u $user git clone https://aur.archlinux.org/yay.git
     cd yay
@@ -340,6 +349,7 @@ install_yay() {
     cd /
     rm -rf /tmp/yay
 
+    # Install powerpill
     sudo -u $user yay -S --noconfirm powerpill
 }
 
