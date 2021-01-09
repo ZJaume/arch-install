@@ -280,7 +280,7 @@ mount_partitions() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel pacman-contrib git btrfs-progs grub efibootmgr sudo $KERNELS
+    pacstrap /mnt base base-devel pacman-contrib reflector git btrfs-progs grub efibootmgr sudo $KERNELS
 }
 
 unmount_partitions() {
