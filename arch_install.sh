@@ -445,7 +445,7 @@ set_sudoers() {
 }
 
 set_network() {
-    if [ "$NETWORK_DEVICE" =~ "wl" ]; then
+    if [[ "$NETWORK_DEVICE" =~ ^wl ]]; then
         systemctl enable iwd
 
         # color green 'Enter the network SSID:'
