@@ -487,7 +487,7 @@ set_network() {
 }
 
 set_password() {
-    local user=$1; shift
+    local user=$1
 
     set +e
     for i in $(seq 1 3); do
