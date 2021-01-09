@@ -169,9 +169,6 @@ configure() {
     color green 'Installing additional packages'
     install_packages "$USER_NAME"
 
-    color green 'Clearing package tarballs'
-    clean_packages
-
     color green 'Configuring network'
     set_network
 
@@ -335,10 +332,6 @@ install_yay() {
     rm -rf /tmp/yay
 
     sudo -u $user yay -S --noconfirm powerpill
-}
-
-clean_packages() {
-    yes | pacman -Scc
 }
 
 update_pkgfile() {
