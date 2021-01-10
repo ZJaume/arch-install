@@ -60,12 +60,14 @@ KEYMAP='es'
 
 # CPU vendor: 'intel' or 'amd'
 CPU='intel'
+#CPU='amd'
 
 # Choose your video driver
 # For Intel
 VIDEO_DRIVER="i915"
 # For nVidia
 #VIDEO_DRIVER="nouveau"
+#VIDEO_DRIVER="nvdidia"
 # For ATI
 #VIDEO_DRIVER="radeon"
 # For generic stuff
@@ -291,28 +293,27 @@ install_packages() {
     local packages=''
 
     # General utilities/libraries
-    packages+=' alsa-utils python rfkill rsync unrar unzip zip pigz wget curl screen tmux systemd-sysvcompat fish'
+    packages+=' vim alsa-utils python rfkill rsync unrar unzip zip pigz wget curl screen tmux fish hdparm pkgstats'
 
     # Network
-    packages+=' dnscrypt-proxy syncthing bind iwd openssh ufw'
+    packages+=' dchpcd dnscrypt-proxy syncthing bind iwd openssh ufw speedtest-cli'
 
     # Filesystems
     packages+=' parted dosfstools ntfsprogs exfat-utils'
 
-    # Misc programs
-    packages+=' vlc hunspell-en_US hunspell-es_any hunspell-ca'
-
     # Graphics drivers
-    #TODO review graphics stuff
     if [ "$VIDEO_DRIVER" = "i915" ]
     then
-        packages+=' xf86-video-intel libva-intel-driver'
+        packages+=' xf86-video-intel mesa libva-intel-driver vulkan-intel vulkan-icd-loader'
     elif [ "$VIDEO_DRIVER" = "nouveau" ]
     then
-        packages+=' xf86-video-nouveau'
+        packages+=' xf86-video-nouveau mesa libva-mesa-driver mesa-vdpau'
+    elif [ "$VIDEO_DRIVER" = "nvidia" ]
+    then
+        packages+=' nvidia nvidia-utils vulkan-icd-loader'
     elif [ "$VIDEO_DRIVER" = "radeon" ]
     then
-        packages+=' xf86-video-ati'
+        packages+=' xf86-video-ati mesa libva-mesa-driver mesa-vdpau vulkan-radeon vulkan-icd-loader'
     elif [ "$VIDEO_DRIVER" = "vesa" ]
     then
         packages+=' xf86-video-vesa'
