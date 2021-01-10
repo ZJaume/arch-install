@@ -329,7 +329,7 @@ install_yay() {
     reflector --verbose --protocol https --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
 
     # Configure makepkg and pacman
-    sed -i 's/^#MAKEFLAGS.*/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
+    sed -i 's/^#\?MAKEFLAGS.*/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
     sed -i 's/^BUILDENV=.*/BUILDENV=(!distcc color ccache check !sign)/' /etc/makepkg.conf
     sed -i 's/^SigLevel.*/SigLevel = PackageRequired/' /etc/pacman.conf
     sed -i 's/^#Color$/Color/' /etc/pacman.conf
@@ -429,7 +429,7 @@ set_daemons() {
     #sudo -u $user systemctl enable --user syncthing
 
     # Enable dnscrypt
-    sed -i "s/^server_names/server_names = ['cloudflare', 'dnscrypt.eu-dk']/'" /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+    sed -i "s/^[# ]*server_names/server_names = ['cloudflare', 'dnscrypt.eu-dk']/" /etc/dnscrypt-proxy/dnscrypt-proxy.toml
     systemctl enable dnscrypt-proxy
 
     # Avoid resolv.conf being written by other programs
@@ -452,7 +452,7 @@ set_grub() {
     fi
 
     sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet cryptdevice=UUID=$crypt_uuid:$LUKS_NAME$DISCARDS\"/" /etc/default/grub
-    sed -i 's/^#GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
+    sed -i 's/^#\?GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
     sed -i 's/^GRUB_PRELOAD_MODULES=.*/GRUB_PRELOAD_MODULES="part_gpt"/' /etc/default/grub
 
     grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
