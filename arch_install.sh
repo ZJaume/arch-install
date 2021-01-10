@@ -54,10 +54,6 @@ USER_NAME='user'
 # System timezone.
 TIMEZONE='Europe/Madrid'
 
-# Have /tmp on a tmpfs or not.  Leave blank to disable.
-# Only leave this blank on systems with very little RAM.
-TMP_ON_TMPFS='TRUE'
-
 # System locale and keymap
 LOCALE='ca_ES.UTF-8'
 KEYMAP='es'
@@ -115,7 +111,7 @@ setup() {
     install_base
 
     color green 'Setting fstab'
-    set_fstab "$TMP_ON_TMPFS" "$efi_dev"
+    set_fstab
 
     color green 'Chrooting into installed system to continue setup...'
     cp $0 /mnt/setup.sh
@@ -176,7 +172,7 @@ configure() {
     set_network
 
     color green 'Setting initial daemons'
-    set_daemons "$TMP_ON_TMPFS"
+    set_daemons "$USER_NAME"
 
     color green 'Setting initial modules to load'
     set_modules_load
@@ -280,7 +276,7 @@ mount_partitions() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel pacman-contrib reflector git btrfs-progs grub efibootmgr sudo $KERNELS
+    pacstrap /mnt base base-devel pacman-contrib reflector ccache git btrfs-progs grub efibootmgr sudo $KERNELS
 }
 
 unmount_partitions() {
@@ -336,9 +332,9 @@ install_yay() {
     reflector --verbose --protocol https --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
 
     # Configure makepkg and pacman
-    sed -i 's/^#MAKEFLAGS/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
-    sed -i 's/^BUILDENV=/BUILDENV=(!distcc color ccache check !sign)/' /etc/makepkg.conf
-    sed -i 's/^SigLevel/SigLevel = PackageRequired/' /etc/pacman.conf
+    sed -i 's/^#MAKEFLAGS.*/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
+    sed -i 's/^BUILDENV=.*/BUILDENV=(!distcc color ccache check !sign)/' /etc/makepkg.conf
+    sed -i 's/^SigLevel.*/SigLevel = PackageRequired/' /etc/pacman.conf
 
     # Build yay
     cd /tmp
@@ -424,6 +420,8 @@ set_initcpio() {
 }
 
 set_daemons() {
+    local user=$1; shift
+
     # Set firewall
     systemctl enable ufw
     systemctl start ufw
@@ -434,7 +432,7 @@ set_daemons() {
     ufw status
 
     # Enable syncthing daemon
-    systemctl enable syncthing
+    #sudo -u $user systemctl enable --user syncthing
 
     # Enable dnscrypt
     sed -i "s/^server_names/server_names = ['cloudflare', 'dnscrypt.eu-dk']/'" /etc/dnscrypt-proxy/dnscrypt-proxy.toml
