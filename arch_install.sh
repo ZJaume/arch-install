@@ -179,9 +179,6 @@ configure() {
     color green 'Setting initial daemons'
     set_daemons "$USER_NAME"
 
-    color green 'Building locate database'
-    update_locate
-
     rm /setup.sh
 }
 
