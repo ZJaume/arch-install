@@ -293,7 +293,7 @@ install_packages() {
     packages+=' vim alsa-utils python rfkill rsync unrar unzip zip pigz wget curl screen tmux fish hdparm pkgstats'
 
     # Network
-    packages+=' dhcpcd dnscrypt-proxy syncthing bind iwd openssh ufw speedtest-cli'
+    packages+=' openresolv dhcpcd dnscrypt-proxy syncthing bind iwd openssh ufw speedtest-cli'
 
     # Filesystems
     packages+=' parted dosfstools ntfsprogs exfat-utils'
@@ -429,10 +429,9 @@ set_daemons() {
     sed -i "s/^[# ]*server_names/server_names = ['cloudflare', 'dnscrypt.eu-dk']/" /etc/dnscrypt-proxy/dnscrypt-proxy.toml
     systemctl enable dnscrypt-proxy
 
-    # Avoid resolv.conf being written by other programs
-    echo "nameserver 127.0.0.1" > /etc/resolv.conf
-    chattr +i /etc/resolv.conf
-    echo "nohook resolv.conf" >> /etc/dhcpcd.conf
+    # Set loacl resolver only
+    echo "name_servers='127.0.0.1'" >> /etc/resolvconf.conf
+    echo "resolv_conf_local_only='TRUE'" >> /etc/resolvconf.conf
     systemctl disable systemd-resolved
 
     # Paccache timer
