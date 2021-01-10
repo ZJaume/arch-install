@@ -332,7 +332,7 @@ install_yay() {
     sed -i 's/^#MAKEFLAGS.*/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
     sed -i 's/^BUILDENV=.*/BUILDENV=(!distcc color ccache check !sign)/' /etc/makepkg.conf
     sed -i 's/^SigLevel.*/SigLevel = PackageRequired/' /etc/pacman.conf
-    sed -i 's/^#Color$/Color' /etc/pacman.conf
+    sed -i 's/^#Color$/Color/' /etc/pacman.conf
 
     # Build yay
     cd /tmp
