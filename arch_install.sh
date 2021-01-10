@@ -296,7 +296,7 @@ install_packages() {
     packages+=' vim alsa-utils python rfkill rsync unrar unzip zip pigz wget curl screen tmux fish hdparm pkgstats'
 
     # Network
-    packages+=' dchpcd dnscrypt-proxy syncthing bind iwd openssh ufw speedtest-cli'
+    packages+=' dhcpcd dnscrypt-proxy syncthing bind iwd openssh ufw speedtest-cli'
 
     # Filesystems
     packages+=' parted dosfstools ntfsprogs exfat-utils'
