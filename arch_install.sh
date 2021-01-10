@@ -58,6 +58,9 @@ TIMEZONE='Europe/Madrid'
 LOCALE='ca_ES.UTF-8'
 KEYMAP='es'
 
+# CPU vendor: 'intel' or 'amd'
+CPU='intel'
+
 # Choose your video driver
 # For Intel
 VIDEO_DRIVER="i915"
@@ -174,9 +177,6 @@ configure() {
     color green 'Setting initial daemons'
     set_daemons "$USER_NAME"
 
-    color green 'Setting initial modules to load'
-    set_modules_load
-
     color green 'Building locate database'
     update_locate
 
@@ -276,7 +276,7 @@ mount_partitions() {
 install_base() {
     echo 'Server = http://mirrors.kernel.org/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
 
-    pacstrap /mnt base base-devel pacman-contrib reflector ccache git btrfs-progs grub efibootmgr sudo $KERNELS
+    pacstrap /mnt base base-devel pacman-contrib reflector ccache git btrfs-progs grub efibootmgr $CPU-ucode sudo $KERNELS
 }
 
 unmount_partitions() {
@@ -301,10 +301,6 @@ install_packages() {
 
     # Misc programs
     packages+=' vlc hunspell-en_US hunspell-es_any hunspell-ca'
-
-    # On Intel processors
-    #TODO review microcode stuff
-    packages+=' intel-ucode'
 
     # Graphics drivers
     #TODO review graphics stuff
@@ -390,10 +386,6 @@ EOF
 set_fstab() {
     # Try genfstab
     genfstab -U /mnt >> /mnt/etc/fstab
-}
-
-set_modules_load() {
-    echo 'microcode' > /etc/modules-load.d/intel-ucode.conf
 }
 
 set_initcpio() {
